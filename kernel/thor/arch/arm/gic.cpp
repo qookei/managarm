@@ -250,16 +250,29 @@ void GicDistributor::dumpPendingSgis() {
 }
 
 uint8_t GicDistributor::getCurrentCpuIfaceNo_() {
-	// Read target of SGI0-3
-	auto v = arch::scalar_load<uint32_t>(space_, dist_reg::irqTargetBase);
-	assert(v && "SGI 0-3 target doesn't have any CPU?");
+	uint8_t mask = 0;
+	for (size_t i = 0; i < 8; i++) {
+		auto v = arch::scalar_load<uint32_t>(space_, dist_reg::irqTargetBase + i * 4);
 
-	auto mask = ((v >> 24) & 0xFF)
-		| ((v >> 16) & 0xFF)
-		| ((v >> 8) & 0xFF)
-		| (v & 0xFF);
+		if (!v) {
+			infoLogger() << "thor: zero v at i = " << i << "? ignoring" << frg::endlog;
+		}
 
-	assert(__builtin_popcount(mask) == 1);
+		//assert(v && "SGI target doesn't have any CPU?");
+
+		auto old_mask = mask;
+
+		mask |= ((v >> 24) & 0xFF)
+			| ((v >> 16) & 0xFF)
+			| ((v >> 8) & 0xFF)
+			| (v & 0xFF);
+
+		if (__builtin_popcount(mask) != 1) {
+			panicLogger() << "thor: bad v = " << frg::hex_fmt{v} << " at i = " << i << ", prev mask = " << frg::hex_fmt{old_mask} << frg::endlog;
+		}
+
+		assert(__builtin_popcount(mask) == 1);
+	}
 
 	return __builtin_ctz(mask);
 }
