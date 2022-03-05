@@ -5,3 +5,4 @@ eir_c_args += ['-mgeneral-regs-only', '-mno-unaligned-access']
 
 subdir('raspi4')
 subdir('virt')
+subdir('exynos7870')
