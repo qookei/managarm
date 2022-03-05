@@ -1256,6 +1256,9 @@ void checkPciBus(PciBus *bus, EnumFunc &&enumerateDownstream) {
 }
 
 void runAllDevices() {
+	if (!allDevices)
+		allDevices.initialize(*kernelAlloc);
+
 	for (auto dev : *allDevices)
 		runDevice(dev);
 }
@@ -1797,6 +1800,12 @@ uint32_t findHighestId(PciBus *bus) {
 }
 
 void enumerateAll() {
+	if (!enumerationQueue)
+		enumerationQueue.initialize(*kernelAlloc);
+
+	if (!allRootBuses)
+		allRootBuses.initialize(*kernelAlloc);
+
 	if (!allDevices)
 		allDevices.initialize(*kernelAlloc);
 
