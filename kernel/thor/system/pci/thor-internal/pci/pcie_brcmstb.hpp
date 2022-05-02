@@ -40,6 +40,7 @@ private:
 	uint8_t busStart_;
 	uint8_t busEnd_;
 
+	DeviceTreeNode *node_;
 	arch::mem_space regSpace_;
 };
 

@@ -108,7 +108,7 @@ namespace mdio {
 } // namespace mdio
 
 BrcmStbPcie::BrcmStbPcie(DeviceTreeNode *node, uint16_t seg, uint8_t busStart, uint8_t busEnd)
-: seg_{seg}, busStart_{busStart}, busEnd_{busEnd} {
+: seg_{seg}, busStart_{busStart}, busEnd_{busEnd}, node_{node} {
 	auto addr = node->reg()[0].addr;
 	auto size = (node->reg()[0].size + 0xFFF) & ~0xFFF;
 
@@ -116,7 +116,7 @@ BrcmStbPcie::BrcmStbPcie(DeviceTreeNode *node, uint16_t seg, uint8_t busStart, u
 	for (size_t i = 0; i < size; i += 0x1000) {
 		KernelPageSpace::global().mapSingle4k(
 				VirtualAddr(ptr) + i, addr + i,
-				page_access::write, CachingMode::mmioNonPosted);
+				page_access::write, CachingMode::mmio);
 	}
 
 	regSpace_ = arch::mem_space{ptr};
@@ -165,8 +165,15 @@ void BrcmStbPcie::init_() {
 	if (!(regSpace_.load(reg::bridgeState) & bridgeState::rcMode))
 		panicLogger() << "thor: Bridge is in EP mode" << frg::endlog;
 
-	// TODO: read this out of the DT
-	setOutboundWindow_(0, 0x600000000, 0xC0000000, 0x40000000);
+
+	for (auto &r : node_->ranges()) {
+		assert(r.childAddrHiValid);
+		assert(((r.childAddrHi >> 24) & 0b11) == 2);
+
+		infoLogger() << "thor: Installing window from " << (void *)r.parentAddr << " to " << (void *)r.childAddr << " of size " << r.size << frg::endlog;
+
+		setOutboundWindow_(0, r.parentAddr, r.childAddr, r.size);
+	}
 
 	regSpace_.store(reg::priv1LinkCap, regSpace_.load(reg::priv1LinkCap)
 			/ priv1::linkCap(0b11)); // L1 & L0s
@@ -220,27 +227,25 @@ void BrcmStbPcie::setOutboundWindow_(int n, uint64_t cpuAddr, uint64_t pcieAddr,
 	regSpace_.store(pcieLo, pcieAddr);
 	regSpace_.store(pcieHi, pcieAddr >> 32);
 
-	arch::bit_register<uint32_t> baseLimit{0x4070 + n * 4};
-	arch::field<uint32_t, uint16_t> base{4, 12};
-	arch::field<uint32_t, uint16_t> limit{20, 12};
+	arch::scalar_register<uint32_t> baseLimit{0x4070 + n * 4};
 
-	auto baseMB = cpuAddr / 0x100000;
-	auto limitMB = (cpuAddr + size - 1) / 0x100000;
+	auto base = cpuAddr;
+	auto limit = (cpuAddr + size - 1);
 
-	regSpace_.store(baseLimit, regSpace_.load(baseLimit)
-			/ base(cpuAddr / 0x100000)
-			/ limit(limitMB));
+	regSpace_.store(baseLimit, 
+			((cpuAddr >> 16) & 0xfff0) |
+			((cpuAddr + size - 1) & 0xfff00000));
 
-	constexpr uint64_t hiShift = 12;
+	constexpr uint64_t hiShift = 32;
 
 	arch::bit_register<uint32_t> baseHi{0x4080 + n * 8};
 	arch::bit_register<uint32_t> limitHi{0x4084 + n * 8};
 	arch::field<uint32_t, uint8_t> hiMask{0, 8};
 
 	regSpace_.store(baseHi, regSpace_.load(baseHi)
-		/ hiMask(baseMB >> hiShift));
+		/ hiMask(base >> hiShift));
 	regSpace_.store(limitHi, regSpace_.load(limitHi)
-		/ hiMask(limitMB >> hiShift));
+		/ hiMask(limit >> hiShift));
 }
 
 uint32_t BrcmStbPcie::mdioRead_(uint8_t port, uint8_t reg) {
