@@ -1496,7 +1496,7 @@ void configureBridges(PciBus *root, PciBus *bus, uint32_t &highestId) {
 		assert(bridge->associatedBus && "Bridge has no associated bus");
 
 		// Look for any existing bridge resources
-		checkForBridgeResources(bridge);
+		//checkForBridgeResources(bridge);
 
 		configureBridges(root, bridge->associatedBus, highestId);
 	}
@@ -1747,6 +1747,18 @@ void allocateBars(PciBus *bus) {
 							kPciBridgePrefetchMemLimitUpper, (childBase + req.size - 0x100000) >> 32);
 					break;
 			}
+
+			// Enable address decoding
+			auto cmd = io->readConfigHalf(entity->parentBus,
+					entity->slot, entity->function, kPciCommand);
+
+			if (flags == PciBusResource::io)
+				cmd |= 0x01;
+			else
+				cmd |= 0x02;
+
+			io->writeConfigHalf(entity->parentBus, entity->slot,
+					entity->function, kPciCommand, cmd);
 
 			req.associatedBridge->associatedBus->resources.push_back(
 					{childBase, req.size, hostBase, req.flags, resource->isHostMmio()});
