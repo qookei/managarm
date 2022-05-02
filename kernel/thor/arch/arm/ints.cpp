@@ -71,6 +71,7 @@ namespace {
 		if ((error & kPfWrite) && (error & kPfAccess) && !inHigherHalf(*image.faultAddr())) {
 			// Check if it's just a writable page that's not dirty yet
 			smarter::borrowed_ptr<Thread> this_thread = getCurrentThread();
+			assert(this_thread);
 			return this_thread->getAddressSpace()->updatePageAccess(*image.faultAddr() & ~(kPageSize - 1));
 		}
 
