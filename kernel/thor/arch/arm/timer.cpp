@@ -71,7 +71,7 @@ struct VirtualGenericTimer : IrqSink, AlarmTracker {
 			diff = 0;
 		}
 
-		uint64_t compare = getVirtualTimestampCounter() + ticksPerSecond * diff / 1000000000;
+		uint64_t compare = getVirtualTimestampCounter() + ticksPerMilli * diff / 1000000;
 
 		asm volatile ("msr cntv_cval_el0, %0" :: "r"(compare));
 	}
@@ -96,7 +96,9 @@ void initializeTimers() {
 }
 
 void armPreemption(uint64_t nanos) {
-	uint64_t compare = getRawTimestampCounter() + ticksPerSecond * nanos / 1000000000;
+	auto now = getRawTimestampCounter();
+
+	uint64_t compare = now + ticksPerMilli * nanos / 1000000;
 
 	asm volatile ("msr cntp_cval_el0, %0" :: "r"(compare));
 	getCpuData()->preemptionIsArmed = true;
