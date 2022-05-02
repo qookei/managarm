@@ -100,6 +100,13 @@ frg::expected<Error> VirtualOperations::faultPage(VirtualAddr va, MemoryView *vi
 	mapSingle4k(va & ~(kPageSize - 1), physicalRange.get<0>() & ~(kPageSize - 1),
 			flags, physicalRange.get<1>());
 
+#ifdef __aarch64__
+	if (flags & page_access::execute) {
+		auto pageAddr = va & ~(kPageSize - 1);
+		invalidateAllCacheRange(pageAddr, pageAddr + kPageSize);
+	}
+#endif
+
 	if(status & page_status::present) {
 		if(status & page_status::dirty)
 			view->markDirty(offset & ~(kPageSize - 1), kPageSize);

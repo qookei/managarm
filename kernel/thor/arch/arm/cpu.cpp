@@ -293,4 +293,43 @@ void initializeThisProcessor() {
 	assert(cpu_data->generalWorkQueue);
 }
 
+size_t icacheLineSize() {
+	uint64_t ctr;
+	asm volatile ("mrs %0, ctr_el0" : "=r"(ctr));
+
+	return (ctr & 0b1111) << 4;
+}
+
+size_t dcacheLineSize() {
+	uint64_t ctr;
+	asm volatile ("mrs %0, ctr_el0" : "=r"(ctr));
+
+	return ((ctr >> 16) & 0b1111) << 4;
+}
+
+inline constexpr uint64_t lowerHalfEnd = 0x800000000000;
+
+void invalidateAllCacheRange(uintptr_t start, uintptr_t end) {
+	if (start < lowerHalfEnd && end > lowerHalfEnd)
+		end = lowerHalfEnd;
+
+	auto dsz = dcacheLineSize(), isz = icacheLineSize();
+
+	auto addr = start & ~(dsz - 1);
+	while (addr < end) {
+		asm volatile ("dc civac, %0" :: "r"(addr) : "memory");
+		addr += dsz;
+	}
+
+	asm volatile ("dsb ish");
+
+	addr = start & ~(isz - 1);
+	while (addr < end) {
+		asm volatile ("ic ivau, %0" :: "r"(addr) : "memory");
+		addr += isz;
+	}
+
+	asm volatile ("dsb ish\n\tisb");
+}
+
 } // namespace thor

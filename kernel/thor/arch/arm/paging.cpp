@@ -11,12 +11,12 @@ static inline constexpr uint64_t tlbiValue(uint16_t asid, uint64_t va = 0) {
 }
 
 void invalidatePage(const void *address) {
-	asm volatile ("dsb st;\n\t\
-			tlbi vale1, %0;\n\t\
-			dsb sy; isb"
-			:
-			: "r"(tlbiValue(0, reinterpret_cast<uintptr_t>(address)))
-			: "memory");
+	// There's no instruction that invalidates a mapping on the current ASID,
+	// so we get the current ASID from TTBR0 instead.
+	uint64_t ttbr0;
+	asm volatile ("mrs %0, ttbr0_el1" : "=r" (ttbr0) :: "memory");
+
+	invalidatePage((ttbr0 >> 48) & 0xFFFF, address);
 }
 
 void invalidateAsid(int asid) {
@@ -40,7 +40,7 @@ void invalidatePage(int asid, const void *address) {
 // TODO: TLBI ALLE1 is invalid in EL1...
 void invalidateFullTlb() {
 	asm volatile ("dsb st;\n\t\
-			tlbi alle1;\n\t\
+			tlbi vmalle1;\n\t\
 			dsb sy; isb"
 			::: "memory");
 }
@@ -680,7 +680,6 @@ ClientPageSpace::~ClientPageSpace() {
 	}
 
 	physicalAllocator->free(rootTable(), kPageSize);
-
 }
 
 void ClientPageSpace::mapSingle4k(VirtualAddr pointer, PhysicalAddr physical, bool user_page,
@@ -879,7 +878,7 @@ PageStatus ClientPageSpace::cleanSingle4k(VirtualAddr pointer) {
 	PageStatus ps = page_status::present;
 	if ((bits & kPageShouldBeWritable) && !(bits & kPageRO)) {
 		ps |= page_status::dirty;
-		tbl3[index3].atomic_exchange(bits & ~kPageRO);
+		tbl3[index3].atomic_exchange(bits | kPageRO);
 	}
 
 	// TODO: perform proper shootdown to update mapping (we updated the RO flag)
