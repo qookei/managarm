@@ -18,7 +18,7 @@
 
 enum {
 	// largest system call number plus 1
-	kHelNumCalls = 103,
+	kHelNumCalls = 104,
 
 	kHelCallLog = 1,
 	kHelCallPanic = 10,
@@ -58,6 +58,7 @@ enum {
 	kHelCallSubmitLockMemoryView = 48,
 	kHelCallLoadahead = 49,
 	kHelCallCreateVirtualizedSpace = 50,
+	kHelCallInvalidateDataCache = 103,
 
 	kHelCallCreateThread = 67,
 	kHelCallQueryThreadStats = 95,
@@ -817,6 +818,15 @@ HEL_C_LINKAGE HelError helSubmitLockMemoryView(HelHandle handle, uintptr_t offse
 HEL_C_LINKAGE HelError helLoadahead(HelHandle handle, uintptr_t offset, size_t length);
 
 HEL_C_LINKAGE HelError helCreateVirtualizedSpace(HelHandle *handle);
+
+//! Performs data cache invalidation for memory in the specified range.
+//!
+//! This is necessary for accessing DMA memory of devices that are not cache-coherent.
+//! @param[in] ptr
+//!     Pointer to the start of the range to invalidate.
+//! @param[in] length
+//!     Length of the range to invalidate.
+HEL_C_LINKAGE HelError helInvalidateDataCache(void *ptr, size_t length);
 
 //! @}
 //! @name Thread Management

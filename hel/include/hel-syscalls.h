@@ -454,5 +454,10 @@ extern inline __attribute__ (( always_inline )) HelError helQueryRegisterInfo(in
 	return helSyscall2(kHelCallQueryRegisterInfo, (HelWord)set, (HelWord)info);
 };
 
+extern inline __attribute__ (( always_inline )) HelError helInvalidateDataCache(void *addr,
+		size_t size) {
+	return helSyscall2(kHelCallInvalidateDataCache, (HelWord)addr, (HelWord)size);
+};
+
 #endif // HEL_SYSCALLS_H
 

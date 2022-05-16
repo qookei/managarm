@@ -332,4 +332,26 @@ void invalidateAllCacheRange(uintptr_t start, uintptr_t end) {
 	asm volatile ("dsb ish\n\tisb");
 }
 
+Error invalidateDataCache(void *ptr, size_t size) {
+	auto dsz = dcacheLineSize();
+	auto addr = reinterpret_cast<uintptr_t>(ptr) & ~(dsz - 1);
+	auto end = reinterpret_cast<uintptr_t>(ptr) + size;
+
+	if (addr < lowerHalfEnd && end > lowerHalfEnd)
+		end = lowerHalfEnd;
+
+	if (end >= lowerHalfEnd)
+		return Error::fault;
+
+	while (addr < end) {
+		asm volatile ("dc ivac, %0" :: "r"(addr) : "memory");
+		addr += dsz;
+	}
+
+	asm volatile ("dsb ish");
+
+	return Error::success;
+}
+
+
 } // namespace thor

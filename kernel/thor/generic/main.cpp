@@ -861,6 +861,10 @@ void handleSyscall(SyscallImageAccessor image) {
 		*image.error() = helQueryRegisterInfo((int)arg0, (HelRegisterInfo *)arg1);
 	} break;
 
+	case kHelCallInvalidateDataCache: {
+		*image.error() = helInvalidateDataCache((void *)arg0, (size_t)arg1);
+	} break;
+
 	default:
 		*image.error() = kHelErrIllegalSyscall;
 	}

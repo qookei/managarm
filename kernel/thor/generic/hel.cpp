@@ -3315,3 +3315,21 @@ HelError helQueryRegisterInfo(int set, HelRegisterInfo *info) {
 	return kHelErrNone;
 }
 
+HelError helInvalidateDataCache(void *ptr, size_t length) {
+#if defined (__aarch64__)
+	auto err = invalidateDataCache(ptr, length);
+
+	if (err == Error::fault) {
+		return kHelErrFault;
+	} else {
+		assert(err == Error::success);
+		return kHelErrNone;
+	}
+
+#else
+	(void)ptr;
+	(void)length;
+	return kHelErrNone;
+#endif
+}
+

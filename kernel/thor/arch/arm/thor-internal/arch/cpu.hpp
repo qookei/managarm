@@ -396,5 +396,6 @@ initgraph::Stage *getBootProcessorReadyStage();
 bool preemptionIsArmed();
 
 void invalidateAllCacheRange(uintptr_t start, uintptr_t end);
+Error invalidateDataCache(void *ptr, size_t size);
 
 } // namespace thor
