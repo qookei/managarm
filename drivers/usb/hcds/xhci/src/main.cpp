@@ -9,6 +9,7 @@
 #include <memory>
 
 #include <arch/dma_pool.hpp>
+#include <arch/cache.hpp>
 #include <async/result.hpp>
 #include <helix/ipc.hpp>
 #include <protocols/hw/client.hpp>
@@ -257,6 +258,7 @@ async::detached Controller::initialize() {
 		_scratchpadBufs.push_back(arch::dma_buffer(&_memoryPool,
 					page_size));
 
+		arch::clean_dcache_for_dma(_scratchpadBufs.back().data(), page_size);
 		_scratchpadBufArray[i] = helix::ptrToPhysical(_scratchpadBufs.back().data());
 	}
 
@@ -264,6 +266,9 @@ async::detached Controller::initialize() {
 		_dcbaa[i] = 0;
 
 	_dcbaa[0] = helix::ptrToPhysical(_scratchpadBufArray.data());
+
+	arch::clean_dcache_for_dma(_scratchpadBufArray.data(), max_scratchpad_bufs * sizeof(uint64_t));
+	arch::clean_dcache_for_dma(_dcbaa.data(), _dcbaa.size() * sizeof(uint64_t));
 
 	_operational.store(op_regs::dcbaap, helix::ptrToPhysical(_dcbaa.data())); // tell the device about our dcbaa
 
@@ -874,7 +879,12 @@ Controller::Device::enumerate(size_t rootPort, size_t port, uint32_t route, std:
 
 	_initEpCtx(inputCtx, 0, PipeType::control, packetSize, EndpointType::control);
 
+	arch::clean_dcache_for_dma(_devCtx.rawData(), _devCtx.rawSize());
+
 	_controller->_dcbaa[_slotId] = helix::ptrToPhysical(_devCtx.rawData());
+	arch::clean_dcache_for_dma(_controller->_dcbaa.data(), _controller->_dcbaa.size() * sizeof(uint64_t));
+
+	arch::clean_dcache_for_dma(inputCtx.rawData(), inputCtx.rawSize());
 
 	event = co_await _controller->submitCommand(
 			Command::addressDevice(_slotId,
@@ -949,11 +959,15 @@ async::result<frg::expected<UsbError>>
 Controller::Device::setupEndpoint(int endpoint, PipeType dir, size_t maxPacketSize, EndpointType type) {
 	InputContext inputCtx{_controller->_largeCtx, &_controller->_memoryPool};
 
+	HEL_CHECK(helInvalidateDataCache(_devCtx.rawData(), _devCtx.rawSize()));
+
 	inputCtx.get(inputCtxCtrl) |= InputControlFields::add(0); // Slot Context
 	inputCtx.get(inputCtxSlot) = _devCtx.get(deviceCtxSlot);
 	inputCtx.get(inputCtxSlot) |= SlotFields::ctxEntries(31);
 
 	_initEpCtx(inputCtx, endpoint, dir, maxPacketSize, type);
+
+	arch::clean_dcache_for_dma(inputCtx.rawData(), inputCtx.rawSize());
 
 	auto event = co_await _controller->submitCommand(
 			Command::configureEndpoint(_slotId, 
@@ -974,6 +988,8 @@ async::result<frg::expected<UsbError>>
 Controller::Device::configureHub(std::shared_ptr<Hub> hub, DeviceSpeed speed) {
 	InputContext inputCtx{_controller->_largeCtx, &_controller->_memoryPool};
 
+	HEL_CHECK(helInvalidateDataCache(_devCtx.rawData(), _devCtx.rawSize()));
+
 	inputCtx.get(inputCtxCtrl) |= InputControlFields::add(0); // Slot Context
 	inputCtx.get(inputCtxSlot) = _devCtx.get(deviceCtxSlot);
 
@@ -983,6 +999,8 @@ Controller::Device::configureHub(std::shared_ptr<Hub> hub, DeviceSpeed speed) {
 	if (speed == DeviceSpeed::highSpeed)
 		inputCtx.get(inputCtxSlot) |= SlotFields::ttThinkTime(
 				hub->getCharacteristics().unwrap().ttThinkTime / 8 - 1);
+
+	arch::clean_dcache_for_dma(inputCtx.rawData(), inputCtx.rawSize());
 
 	auto event = co_await _controller->submitCommand(
 			Command::evaluateContext(_slotId,
@@ -1093,7 +1111,7 @@ Controller::EndpointState::transfer(InterruptTransfer info) {
 		if (last)
 			trb.val[3] |= 1 << 5; // IOC
 		_device->pushRawTransfer(endpointId - 1, trb, last ? &ev : nullptr);
-	}, info.buffer);
+	}, info.buffer, _type == PipeType::in);
 
 	_device->submit(endpointId);
 
@@ -1113,7 +1131,7 @@ Controller::EndpointState::transfer(BulkTransfer info) {
 		if (last)
 			trb.val[3] |= 1 << 5; // IOC
 		_device->pushRawTransfer(endpointId - 1, trb, last ? &ev : nullptr);
-	}, info.buffer);
+	}, info.buffer, _type == PipeType::in);
 
 	_device->submit(endpointId);
 

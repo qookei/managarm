@@ -1,6 +1,9 @@
 #include "ring.hpp"
 #include "xhci.hpp"
 
+#include <arch/cache.hpp>
+#include <hel.h>
+
 // ------------------------------------------------------------------------
 // Event
 // ------------------------------------------------------------------------
@@ -114,10 +117,14 @@ EventRing::EventRing(Controller *controller)
 		_eventRing->ent[i] = {{0, 0, 0, 0}};
 	}
 
+	arch::clean_dcache_for_dma(_eventRing.data(), sizeof(EventRingEntries));
+
 	_erst[0].ringSegmentBaseLow = getEventRingPtr() & 0xFFFFFFFF;
 	_erst[0].ringSegmentBaseHi = getEventRingPtr() >> 32;
 	_erst[0].ringSegmentSize = eventRingSize;
 	_erst[0].reserved = 0;
+
+	arch::clean_dcache_for_dma(_erst.data(), sizeof(ErstEntry));
 }
 
 uintptr_t EventRing::getErstPtr() {
@@ -133,6 +140,8 @@ size_t EventRing::getErstSize() {
 }
 
 void EventRing::processRing() {
+	HEL_CHECK(helInvalidateDataCache(_eventRing.data(), sizeof(EventRingEntries)));
+
 	while((_eventRing->ent[_dequeuePtr].val[3] & 1) == _ccs) {
 		RawTrb rawEv = _eventRing->ent[_dequeuePtr];
 
@@ -163,6 +172,8 @@ ProducerRing::ProducerRing(Controller *controller)
 	}
 
 	updateLink();
+
+	arch::clean_dcache_for_dma(_ring.data(), sizeof(RingEntries));
 }
 
 uintptr_t ProducerRing::getPtr() {
@@ -186,6 +197,8 @@ void ProducerRing::pushRawTrb(RawTrb cmd, Completion *comp) {
 		_pcs = !_pcs;
 		_enqueuePtr = 0;
 	}
+
+	arch::clean_dcache_for_dma(_ring.data(), sizeof(RingEntries));
 }
 
 void ProducerRing::processEvent(Event ev) {

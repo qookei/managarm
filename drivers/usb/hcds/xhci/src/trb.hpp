@@ -7,6 +7,7 @@
 #include <vector>
 
 #include <arch/dma_pool.hpp>
+#include <arch/cache.hpp>
 #include <helix/memory.hpp>
 
 #include <protocols/usb/usb.hpp>
@@ -159,19 +160,33 @@ namespace Transfer {
 	}
 
 	template <typename FU>
-	inline void buildNormalChain(FU use, arch::dma_buffer_view view) {
+	inline void buildNormalChain(FU use, arch::dma_buffer_view view, bool dataIn) {
+		if (view.size() && dataIn)
+			HEL_CHECK(helInvalidateDataCache(view.data(), view.size()));
+		else if (view.size())
+			arch::clean_dcache_for_dma(view.data(), view.size());
+
 		buildTransferChain(use, true, view, normal);
+
+		if (view.size() && dataIn)
+			HEL_CHECK(helInvalidateDataCache(view.data(), view.size()));
 	}
 
 	template <typename FU>
 	inline void buildControlChain(FU use, SetupPacket setup, arch::dma_buffer_view view, bool dataIn) {
 		bool statusIn = true;
 
-		if (view.size() && dataIn)
+		if (view.size() && dataIn) {
+			HEL_CHECK(helInvalidateDataCache(view.data(), view.size()));
 			statusIn = false;
+		} else if (view.size())
+			arch::clean_dcache_for_dma(view.data(), view.size());
 
 		use(setupStage(setup, view.size(), dataIn), false);
 		buildTransferChain(use, false, view, dataStage, dataIn);
 		use(statusStage(statusIn), true);
+
+		if (view.size() && dataIn)
+			HEL_CHECK(helInvalidateDataCache(view.data(), view.size()));
 	}
 } // namespace Transfer
