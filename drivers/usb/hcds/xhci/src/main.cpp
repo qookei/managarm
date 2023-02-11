@@ -362,7 +362,7 @@ async::result<void> Controller::enumerateDevice(std::shared_ptr<Hub> parentHub, 
 	size_t rootPort = port;
 
 	if (parentHub->parent()) {
-		route |= port > 14 ? 14 : (port + 1);
+		route |= port > 14 ? 15 : (port + 1);
 	}
 
 	std::shared_ptr<Hub> h = parentHub;
@@ -372,7 +372,7 @@ async::result<void> Controller::enumerateDevice(std::shared_ptr<Hub> parentHub, 
 			int port = h->parent()->port();
 
 			route <<= 4;
-			route |= port > 14 ? 14 : (port + 1);
+			route |= port > 14 ? 15 : (port + 1);
 		}
 
 		h = h->parent();
