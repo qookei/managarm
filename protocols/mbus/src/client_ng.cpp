@@ -49,7 +49,7 @@ async::result<Entity> Instance::getEntity(int64_t id) {
 }
 
 async::result<Result<Entity>> Instance::createEntity(std::string_view name, const Properties &properties) {
-	managarm::mbus::CreateObjectNgRequest req;
+	managarm::mbus::CreateObjectRequest req;
 	req.set_name(std::string{name});
 
 	for(auto kv : properties) {
@@ -73,7 +73,7 @@ async::result<Result<Entity>> Instance::createEntity(std::string_view name, cons
 	HEL_CHECK(sendTail.error());
 	HEL_CHECK(recvResp.error());
 
-	auto maybeResp = bragi::parse_head_only<managarm::mbus::CreateObjectNgResponse>(recvResp);
+	auto maybeResp = bragi::parse_head_only<managarm::mbus::CreateObjectResponse>(recvResp);
 	if (!maybeResp)
 		co_return Error::protocolViolation;
 
