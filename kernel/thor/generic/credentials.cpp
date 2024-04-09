@@ -2,6 +2,9 @@
 
 #include <thor-internal/credentials.hpp>
 #include <thor-internal/random.hpp>
+#include <thor-internal/kernel_heap.hpp>
+
+#include <frg/hash_map.hpp>
 
 namespace thor {
 
@@ -25,6 +28,27 @@ Credentials::Credentials() {
 	// ... and variant 1.
 	_credentials[8] &= 0x3f;
 	_credentials[8] |= 0x80;
+}
+
+frg::manual_box<frg::hash_map<
+	frg::string_view,
+	smarter::shared_ptr<Credentials>,
+	frg::hash<frg::string_view>,
+	KernelAlloc
+>> tokenCredentials;
+
+smarter::shared_ptr<Credentials> getTokenCredentialsByType(frg::string_view type) {
+	if (!tokenCredentials.valid())
+		tokenCredentials.initialize(frg::hash<frg::string_view>{}, *kernelAlloc);
+
+	auto it = tokenCredentials->find(type);
+	if (it != tokenCredentials->end()) {
+		return it->get<1>();
+	}
+
+	auto creds = smarter::allocate_shared<Credentials>(*kernelAlloc);
+	tokenCredentials->insert(type, creds);
+	return creds;
 }
 
 } // namespace thor
