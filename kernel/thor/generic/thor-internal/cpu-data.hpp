@@ -5,6 +5,8 @@
 #include <thor-internal/kernel-locks.hpp>
 #include <thor-internal/schedule.hpp>
 
+#include <new>
+
 namespace thor {
 
 // Forward defined for pointers that are part of CpuData.
@@ -64,12 +66,76 @@ struct CpuData : public PlatformCpuData {
 	SingleContextRecordRing *localProfileRing = nullptr;
 };
 
-CpuData *getCpuData(size_t k);
-size_t getCpuCount();
+
+struct PerCpuInitializer {
+	void *target0;
+	void (*init)(void *target);
+};
+
+
+extern "C" char percpuStart[], percpuEnd[];
+
+template <typename T>
+struct PerCpu {
+	T &get() {
+		auto offset =
+			reinterpret_cast<uintptr_t>(&reservation)
+			- reinterpret_cast<uintptr_t>(percpuStart);
+
+		return *std::launder(reinterpret_cast<T *>(getLocalPerCpuBase() + offset));
+	}
+
+	T &getFor(int cpu) {
+		auto size = percpuEnd - percpuStart;
+
+		return *std::launder(reinterpret_cast<T *>(
+					reinterpret_cast<uintptr_t>(&reservation) + size * cpu));
+	}
+
+	T &getInContext(void *context) {
+		auto offset =
+			reinterpret_cast<uintptr_t>(&reservation)
+			- reinterpret_cast<uintptr_t>(percpuStart);
+
+		return *std::launder(reinterpret_cast<T *>(
+					reinterpret_cast<uintptr_t>(context) + offset));
+	}
+
+private:
+	frg::aligned_storage<sizeof(T), alignof(T)> reservation;
+};
+
+#define DEFINE_PERCPU_PRIV(Name, Type, Suffix)				\
+	[[gnu::section(".percpu" Suffix), gnu::used]]			\
+	inline PerCpu<Type> Name;					\
+	[[gnu::section(".percpu_init"), gnu::used]]			\
+	const inline PerCpuInitializer Name ## _initializer_ = {	\
+		&Name,							\
+		[] (void *target) { new(target) Type; }			\
+	}								\
+
+#define DEFINE_PERCPU(Name, Type) DEFINE_PERCPU_PRIV(Name, Type, "")
+
+DEFINE_PERCPU_PRIV(cpuData, CpuData, "_head");
+
+// Extend the per-CPU data area to make space for a new CPU, and run
+// initializers for it.
+// Returns a pointer to the start of the new data.
+void *addNewPerCpuData();
+
+// Run all per-CPU initializers in the given context.
+void initializePerCpuDataFor(void *context);
+
 
 inline CpuData *getCpuData() {
-	return static_cast<CpuData *>(getPlatformCpuData());
+	return &cpuData.get();
 }
+
+inline CpuData *getCpuData(size_t cpu) {
+	return &cpuData.getFor(cpu);
+}
+
+size_t getCpuCount();
 
 inline IrqMutex &irqMutex() {
 	return getCpuData()->irqMutex;
