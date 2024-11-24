@@ -352,4 +352,10 @@ private:
 	uint64_t headPtr_{0};
 };
 
+
+// Ring buffer that stores log records that are produced on this CPU.
+// This is reentrant, i.e., it allows non-maskable interrupts / exceptions to log data.
+// The ring buffer is drained to the global logging sinks.
+DEFINE_PERCPU(localLogRing, ReentrantRecordRing);
+
 } // namespace thor

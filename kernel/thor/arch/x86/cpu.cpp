@@ -544,10 +544,6 @@ void doRunOnStack(void (*function) (void *, void *), void *sp, void *argument) {
 
 extern "C" void syscallStub();
 
-namespace {
-	constinit frg::manual_box<ReentrantRecordRing> bootLogRing;
-}
-
 // Set up the kernel GS segment.
 void setupCpuContext(AssemblyCpuData *context) {
 	common::x86::wrmsr(common::x86::kMsrIndexGsBase,
@@ -555,11 +551,8 @@ void setupCpuContext(AssemblyCpuData *context) {
 }
 
 void setupBootCpuContext() {
-	bootLogRing.initialize();
-
 	CpuData *data = &cpuData.getFor(0);
 	initializePerCpuDataFor(data);
-	data->localLogRing = bootLogRing.get();
 	setupCpuContext(data);
 }
 
@@ -817,7 +810,6 @@ void bootSecondary(unsigned int apic_id) {
 	auto context = addNewPerCpuData();
 	auto &newCpuData = cpuData.getInContext(context);
 	newCpuData.localApicId = apic_id;
-	newCpuData.localLogRing = frg::construct<ReentrantRecordRing>(*kernelAlloc);
 
 	// Participate in global TLB invalidation *before* paging is used by the target CPU.
 	initializeAsidContext(&newCpuData);

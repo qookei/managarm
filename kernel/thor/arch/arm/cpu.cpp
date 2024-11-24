@@ -227,20 +227,13 @@ void doRunOnStack(void (*function) (void *, void *), void *sp, void *argument) {
 
 Error getEntropyFromCpu(void *buffer, size_t size) { return Error::noHardwareSupport; }
 
-namespace {
-	constinit frg::manual_box<ReentrantRecordRing> bootLogRing;
-}
-
 void setupCpuContext(AssemblyCpuData *context) {
 	asm volatile("msr tpidr_el1, %0" :: "r"(context));
 }
 
 void setupBootCpuContext() {
-	bootLogRing.initialize();
-
 	CpuData *data = &cpuData.getFor(0);
 	initializePerCpuDataFor(data);
-	data->localLogRing = bootLogRing.get();
 	setupCpuContext(data);
 }
 

@@ -58,7 +58,7 @@ namespace {
 				auto lock = frg::guard(&logMutex);
 
 				char buffer[logLineLength];
-				auto [success, recordPtr, nextPtr, actualSize] = cpuData->localLogRing->dequeueAt(
+				auto [success, recordPtr, nextPtr, actualSize] = localLogRing.get().dequeueAt(
 						cpuData->localLogSeq, buffer, logLineLength);
 				if (!success)
 					break;
@@ -144,7 +144,7 @@ namespace {
 			emitUrgent = true;
 
 		if (!emitUrgent) {
-			cpuData->localLogRing->enqueue(record.data(), record.size());
+			localLogRing.get().enqueue(record.data(), record.size());
 
 			// If the expedited flag is set, we always emit logs.
 			// This is the path that kernel panics should usually take.

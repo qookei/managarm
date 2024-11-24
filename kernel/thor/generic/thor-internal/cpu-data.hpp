@@ -12,7 +12,6 @@ namespace thor {
 // Forward defined for pointers that are part of CpuData.
 struct KernelFiber;
 struct SingleContextRecordRing;
-struct ReentrantRecordRing;
 struct SelfIntCallBase;
 struct WorkQueue;
 
@@ -49,10 +48,6 @@ struct CpuData : public PlatformCpuData {
 
 	IseqContext regularIseq;
 
-	// Ring buffer that stores log records that are produced on this CPU.
-	// This is reentrant, i.e., it allows non-maskable interrupts / exceptions to log data.
-	// The ring buffer is drained to the global logging sinks.
-	ReentrantRecordRing *localLogRing;
 	// Current dequeue sequence for localLogRing.
 	uint64_t localLogSeq{0};
 	// Whether we should avoid emittings logs due to latency overhead (e.g., in IRQ/NMI context).

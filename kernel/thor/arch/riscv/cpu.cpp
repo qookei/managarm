@@ -89,8 +89,6 @@ void doRunOnStack(void (*function)(void *, void *), void *sp, void *argument) {
 
 namespace {
 
-constinit ReentrantRecordRing bootLogRing;
-
 void writeToTp(AssemblyCpuData *context) {
 	asm volatile("mv tp, %0" : : "r"(context));
 }
@@ -172,12 +170,9 @@ void initializeThisProcessor() {
 } // namespace
 
 void setupBootCpuContext() {
-	bootLogRing.initialize();
-
 	CpuData *data = &cpuData.getFor(0);
 	initializePerCpuDataFor(data);
 	data->hartId = thorBootInfoPtr->hartId;
-	data->localLogRing = bootLogRing.get();
 	writeToTp(data);
 }
 

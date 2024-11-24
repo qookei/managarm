@@ -105,7 +105,6 @@ bool bootSecondary(DeviceTreeNode *node) {
 
 	auto context = addNewPerCpuData();
 	auto &newCpuData = cpuData.getInContext(context);
-	newCpuData.localLogRing = frg::construct<ReentrantRecordRing>(*kernelAlloc);
 
 	// Participate in global TLB invalidation *before* paging is used by the target CPU.
 	initializeAsidContext(&newCpuData);
